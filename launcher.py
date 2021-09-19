@@ -2,19 +2,21 @@
 
 import os
 import re
+import signal
 from threading import Thread
 from journal import journal
 
 
 
 
-module_name = "Launcher"
+module_name = "ModuleManager"
+work_dir = "/etc/netping_modulemanager"
 module_start_list = []
 module_kill_list = []
 
 def thrLaunch(command):
-    os.system("python3 /etc/netping_launcher/" + command)
-    journal.WriteLog(module_name, "Normal", "notice", command + "is finished!")
+    os.system("python3 " + work_dir + "/" + command)
+    journal.WriteLog(module_name, "Normal", "notice", command + " is finished!")
 
 def launch():
     for e in module_start_list:
@@ -23,18 +25,18 @@ def launch():
             cmd = "S{:02d}".format(e['priority']) + m
             thr = Thread(target=thrLaunch, args=(cmd,))
             thr.start()
-            journal.WriteLog(module_name, "Normal", "notice", command + "is running!")
+            journal.WriteLog(module_name, "Normal", "notice", cmd + " is running!")
             e['thread'] = thr
 
 def killAll():
     for e in module_kill_list:
         for m in e['modules']:
             cmd = "K{:02d}".format(e['priority']) + m
-            os.system("python3 /etc/netping_launcher/" + cmd)
-            journal.WriteLog(module_name, "Normal", "notice", command + "is running!")
+            os.system("python3 " + work_dir + "/" + cmd)
+            journal.WriteLog(module_name, "Normal", "notice", cmd + " is stopped!")
 
 def scandir():
-    for _,_,files in os.walk("/etc/netping_launcher/"):
+    for _,_,files in os.walk(work_dir):
         for file in files:
             try:
                 #for start entry
@@ -93,17 +95,24 @@ def scandir():
                         module_kill_list.append(value)
 
                 except:
-                    print("Bad files in /etc/netping_launcher directory!")
+                    print("Bad files in " + work_dir + " directory!")
                     return -1
 
-    return 0   
+    return 0
+
+def receiveSignal(signalNumber, frame):
+    killAll()
+    raise SystemExit(0)
+
+def registerSignals():
+    signal.signal(signal.SIGINT, receiveSignal)
+    signal.signal(signal.SIGTERM, receiveSignal)
 
 def main():
-    try:
-        scandir()
+    registerSignals()
+    if scandir() == 0:
         launch()
-    except KeyboardInterrupt:
-        killAll()
+
 
 if __name__ == "__main__":
     main()
