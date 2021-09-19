@@ -10,7 +10,7 @@ from journal import journal
 
 
 module_name = "ModuleManager"
-work_dir = "/etc/netping_modulemanager"
+work_dir = "/etc/netping_modulemanager/modules"
 module_start_list = []
 module_kill_list = []
 
@@ -29,6 +29,7 @@ def launch():
             e['thread'] = thr
 
 def killAll():
+    journal.WriteLog(module_name, "Normal", "notice", "killAll called!")
     for e in module_kill_list:
         for m in e['modules']:
             cmd = "K{:02d}".format(e['priority']) + m
@@ -101,18 +102,26 @@ def scandir():
     return 0
 
 def receiveSignal(signalNumber, frame):
+    journal.WriteLog(module_name, "Normal", "notice", "signal received!" + str(signalNumber))
     killAll()
-    raise SystemExit(0)
+    os.system("rm -f /var/run/" + module_name + ".pid")
+    return
 
 def registerSignals():
     signal.signal(signal.SIGINT, receiveSignal)
     signal.signal(signal.SIGTERM, receiveSignal)
 
+def registerPid():
+    pid = os.getpid()
+
+    with open("/var/run/" + module_name + ".pid", "w") as f:
+        f.write(str(pid))
+
 def main():
     registerSignals()
+    registerPid()
     if scandir() == 0:
         launch()
-
 
 if __name__ == "__main__":
     main()
